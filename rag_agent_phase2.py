@@ -645,7 +645,7 @@ def generation_node(state: RAGState) -> RAGState:
     Supported Intents:
     - summarize: Concise summary of each selected document
     - explain: Detailed explanation in accessible language
-    - compare: Comparative analysis of 2 documents or 1 doc + external context
+    - compare: Comparative analysis of 2+ documents or 1 doc + external context
     - other: Custom question-based generation
     
     Args:
@@ -674,8 +674,6 @@ def generation_node(state: RAGState) -> RAGState:
     # -----------------------------
     if not selected_docs or len(selected_docs) == 0:
         raise ValueError("No documents selected.")
-    if len(selected_docs) > 2:
-        raise ValueError("Currently only 1 or 2 documents can be selected.")
     if not intent:
         raise ValueError("Intent must be provided.")
     if intent == "other" and not custom_question:
@@ -734,30 +732,33 @@ def generation_node(state: RAGState) -> RAGState:
         elif intent == "compare":
             """
             Handle document comparison intent.
-            Supports two modes: 2-document comparison or 1-document + external context.
+            Supports flexible comparison of multiple documents or with external context.
             """
-            if len(selected_docs) == 2:
-                # Two-document comparison mode
+            if len(selected_docs) >= 2:
+                # Multi-document comparison mode
+                docs_for_comparison = "\n\n".join([
+                    f"Document {i+1}:\n{doc.page_content}" for i, doc in enumerate(selected_docs)
+                ])
+                
                 prompt = f"""
                 You are a professional AI assistant on IP-LINK, a platform with access to intellectual property (IP) data from top research universities across the USA. Your role is to help users by answering their questions and continuing multi-turn conversations about university technologies, patents, and innovations in a clear, helpful, and engaging manner. 
 
                 Conversation so far:
                 {history_text}
 
-                Compare the following two documents:
+                Compare the following {len(selected_docs)} documents:
 
-                Document 1:
-                {selected_docs[0].page_content}
+                {docs_for_comparison}
 
-                Document 2:
-                {selected_docs[1].page_content}
-
-                Highlight their differences and similarities in:
-                - Purpose
-                - Technology
-                - Application
+                Provide a comprehensive comparison highlighting:
+                - Key similarities and differences
+                - Purpose and applications of each technology
+                - Technical approaches and methodologies
+                - Potential advantages and limitations
+                - Use cases and target markets
                 """
-            elif (external_context or "").strip():
+                
+            elif len(selected_docs) == 1 and (external_context or "").strip():
                 # Single document + external context comparison mode
                 prompt = f"""
                 You are continuing a conversation about university IPs.
@@ -776,7 +777,7 @@ def generation_node(state: RAGState) -> RAGState:
                 Highlight key similarities and differences in purpose, technology, and potential use cases.
                 """
             else:
-                raise ValueError("Compare requires 2 documents or 1 document + external context.")
+                raise ValueError("Compare requires either 2+ documents or 1 document + external context.")
 
             response = llm.invoke(prompt)
             output = response.content.strip()

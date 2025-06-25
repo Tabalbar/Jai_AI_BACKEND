@@ -217,7 +217,15 @@ def generate_route(request: GenerateRequest):
             "conversation_id": request.conversation_id
         }
     
+    except ValueError as e:
+        # Validation errors - user can fix these
+        if conn:
+            conn.rollback()
+        api_logger.warning(f"Validation error in /generate route: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+        
     except Exception as e:
+        # System errors - internal issues
         if conn:
             conn.rollback()
         api_logger.exception("Error in /generate route", e)
